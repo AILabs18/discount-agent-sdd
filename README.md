@@ -115,6 +115,10 @@ LOG_FILE_PATH=logs/app.jsonl
 Optional settings:
 
 - `OPENAI_MODEL` (default: `gpt-4o-mini`)
+- `AGENT_DISABLE_PAID_LLM` (default: `false`)  
+  When `true`, never calls the OpenAI API; uses deterministic rules if
+  `PRICING_AGENT_FALLBACK=true`. GitHub Actions sets this on PR/main pipelines
+  so CI does not incur LLM cost.
 - `PRICING_AGENT_FALLBACK` (default: `true`)  
   Set to `false` to fail fast when OpenAI is unavailable.
 - `LOG_LEVEL` (default: `INFO`)  
@@ -221,6 +225,9 @@ Runs on **pull requests targeting `main`**:
 
 No SDD verifier and no deploy job on PRs.
 
+Test jobs set `AGENT_DISABLE_PAID_LLM=true` and `PRICING_AGENT_FALLBACK=true`
+so **no paid OpenAI API calls** run on PRs.
+
 #### Pull request pipeline diagram
 
 ```mermaid
@@ -239,6 +246,9 @@ Runs on **pushes to `main`** (for example, after a PR is merged):
 3. `integration-test` (after `build`)
 4. `sdd-verifier` (after both test jobs pass) — `python verifier.py`
 5. `deploy` — dummy placeholder (no target environment)
+
+Unit, integration, and SDD verifier jobs use the same **no paid LLM** env as
+PR workflows unless you change the YAML.
 
 #### Main branch CI pipeline diagram
 

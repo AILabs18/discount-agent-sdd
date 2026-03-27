@@ -115,7 +115,10 @@ def _run_llm_discount(spec: str, customer_tier: str, order_total: float) -> floa
     if not hasattr(openai_module, "OpenAI"):
         raise RuntimeError("openai package is not installed.")
 
-    client = openai_module.OpenAI()
+    try:
+        client = openai_module.OpenAI()
+    except Exception as exc:
+        raise RuntimeError("OpenAI client initialization failed.") from exc
     logger.debug(
         "llm_request_started",
         tier=customer_tier,
@@ -176,7 +179,10 @@ def run_pricing_agent(customer_tier: str, order_total: float) -> dict[str, float
     """
     Execute pricing with an LLM-first strategy.
 
-    Flow: load env -> validate input -> load spec -> run LLM -> fallback if needed.
+    Flow: load env -> validate input -> load spec -> (optional LLM) -> fallback if needed.
+
+    Paid LLM calls are skipped when ``OPENAI_API_KEY`` is unset/blank, or when
+    ``AGENT_DISABLE_PAID_LLM=true`` (default in CI) so PR pipelines stay free.
     """
     _load_dotenv_if_available()
     try:
@@ -187,6 +193,27 @@ def run_pricing_agent(customer_tier: str, order_total: float) -> dict[str, float
 
     spec = load_spec()
     fallback_enabled = os.getenv("PRICING_AGENT_FALLBACK", "true").lower() == "true"
+    api_key_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    disable_paid_llm = os.getenv("AGENT_DISABLE_PAID_LLM", "false").lower() == "true"
+    use_llm = api_key_configured and not disable_paid_llm
+
+    if not use_llm:
+        if not fallback_enabled:
+            raise RuntimeError(
+                "LLM is disabled or OPENAI_API_KEY is not set. "
+                "Set a key and AGENT_DISABLE_PAID_LLM=false, or enable PRICING_AGENT_FALLBACK=true."
+            )
+        reason = "agent_disable_paid_llm" if disable_paid_llm else "openai_api_key_missing"
+        fallback_discount = round(_deterministic_discount(normalized_tier, normalized_total), 2)
+        logger.debug(
+            "pricing_agent_fallback_used",
+            tier=normalized_tier,
+            order_total=normalized_total,
+            discount=fallback_discount,
+            source="deterministic",
+            reason=reason,
+        )
+        return {"discount": fallback_discount}
 
     try:
         discount = _run_llm_discount(spec, normalized_tier, normalized_total)

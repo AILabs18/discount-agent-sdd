@@ -57,6 +57,8 @@ def test_run_pricing_agent_uses_fallback_when_llm_fails(monkeypatch: pytest.Monk
     def _raise_runtime_error(*_args, **_kwargs):
         raise RuntimeError("llm error")
 
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("AGENT_DISABLE_PAID_LLM", "false")
     monkeypatch.setenv("PRICING_AGENT_FALLBACK", "true")
     monkeypatch.setattr(agent_module, "load_spec", lambda: "spec")
     monkeypatch.setattr(agent_module, "_run_llm_discount", _raise_runtime_error)
@@ -71,9 +73,39 @@ def test_run_pricing_agent_raises_when_fallback_disabled(monkeypatch: pytest.Mon
     def _raise_runtime_error(*_args, **_kwargs):
         raise RuntimeError("llm error")
 
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("AGENT_DISABLE_PAID_LLM", "false")
     monkeypatch.setenv("PRICING_AGENT_FALLBACK", "false")
     monkeypatch.setattr(agent_module, "load_spec", lambda: "spec")
     monkeypatch.setattr(agent_module, "_run_llm_discount", _raise_runtime_error)
 
     with pytest.raises(RuntimeError, match="llm error"):
         agent_module.run_pricing_agent("Gold", 250)
+
+
+def test_run_pricing_agent_skips_llm_when_api_key_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_DISABLE_PAID_LLM", "false")
+    monkeypatch.setenv("PRICING_AGENT_FALLBACK", "true")
+    result = _agent_module().run_pricing_agent("VIP", 1000)
+    assert result["discount"] == 200
+
+
+def test_run_pricing_agent_disable_paid_llm_forces_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "would-be-paid-if-called")
+    monkeypatch.setenv("AGENT_DISABLE_PAID_LLM", "true")
+    monkeypatch.setenv("PRICING_AGENT_FALLBACK", "true")
+    result = _agent_module().run_pricing_agent("Gold", 250)
+    assert result["discount"] == 25
+
+
+def test_run_pricing_agent_requires_llm_or_fallback_when_no_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_DISABLE_PAID_LLM", "false")
+    monkeypatch.setenv("PRICING_AGENT_FALLBACK", "false")
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY|LLM is disabled"):
+        _agent_module().run_pricing_agent("Gold", 250)
