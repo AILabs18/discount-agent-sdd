@@ -11,7 +11,7 @@ tests.
 
 - Defines discount rules in a markdown spec.
 - Implements an agent function that calculates discounts from those rules.
-- Verifies acceptance criteria with a lightweight test script.
+- Runs scenario-based verification with pass/fail reporting and summary metrics.
 
 ## Project Structure
 
@@ -24,9 +24,10 @@ tests.
   - VIP: `20%` on all orders
   - Safety cap: discount never exceeds `$500`
 - `verifier.py`  
-  Runs the acceptance checks from the spec:
-  - VIP `$3000` -> `$500` (cap applied)
-  - Gold `$50` -> `$0` (threshold not met)
+  Runs multiple scenarios and prints:
+  - per-scenario status (`PASS` / `FAIL`)
+  - expected vs actual discount
+  - metrics summary (total run, passed, failed, pass rate, execution time)
 - `tests/test_discount_agent.py`  
   Pytest-based checks for acceptance criteria and edge cases.
 
@@ -38,11 +39,42 @@ From the project root:
 python verifier.py
 ```
 
-Expected output:
+Expected output (example):
 
 ```text
 Running SDD verification...
-All spec criteria passed. Ready for deployment.
+
+[PASS] #1 VIP safety cap | Tier=VIP, Total=$3000 | Expected=500, Actual=500.0
+[PASS] #2 Gold threshold not met | Tier=Gold, Total=$50 | Expected=0, Actual=0.0
+...
+
+--- Verification Metrics ---
+Total scenarios run : 6
+Passed              : 6
+Failed              : 0
+Pass rate           : 100.0%
+Execution time      : 2.70 ms
+
+All scenarios passed. Ready for deployment.
+```
+
+Example failing output:
+
+```text
+Running SDD verification...
+
+[PASS] #1 VIP safety cap | Tier=VIP, Total=$3000 | Expected=500, Actual=500.0
+[FAIL] #2 Gold threshold not met | Tier=Gold, Total=$50 | Expected=0, Actual=5.0
+...
+
+--- Verification Metrics ---
+Total scenarios run : 6
+Passed              : 5
+Failed              : 1
+Pass rate           : 83.3%
+Execution time      : 2.61 ms
+
+Verification failed. Please review failed scenarios.
 ```
 
 ## Run Tests (Pytest)
