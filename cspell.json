@@ -1,0 +1,21 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "dotenv",
+    "pytest",
+    "structlog",
+    "pipelines",
+    "jsonl",
+    "SDD",
+    "sdd"
+  ],
+  "ignorePaths": [
+    ".git",
+    "dist",
+    "logs",
+    "__pycache__",
+    ".pytest_cache",
+    "requirements.lock"
+  ]
+}
